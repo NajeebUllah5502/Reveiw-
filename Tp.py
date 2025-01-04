@@ -1,7 +1,6 @@
 import pandas as pd
 import numpy as np
 import requests
-import time
 import streamlit as st
 
 # Fetch data from Binance API
@@ -14,14 +13,12 @@ def fetch_data(symbol='XRPUSDT', interval='1m'):
     }
     try:
         response = requests.get(url, params=params)
-        response.raise_for_status()  # Raise an HTTPError for bad responses (4xx and 5xx)
+        response.raise_for_status()
         data = response.json()
-        
-        # Validate the response structure
         if not isinstance(data, list) or len(data) == 0 or not isinstance(data[0], list):
-            print("Unexpected data format received from Binance API.")
+            st.warning("Unexpected data format received.")
             return pd.DataFrame(columns=['datetime', 'open', 'high', 'low', 'close', 'volume'])
-
+        
         # Extract relevant fields
         o, h, l, c, v = zip(*[(float(d[1]), float(d[2]), float(d[3]), float(d[4]), float(d[5])) for d in data])
         datetime = pd.to_datetime([d[0] for d in data], unit='ms')
@@ -34,10 +31,9 @@ def fetch_data(symbol='XRPUSDT', interval='1m'):
             'close': c,
             'volume': v
         })
-    except (requests.exceptions.RequestException, ValueError) as e:
-        print(f"Error fetching data from Binance API: {e}")
+    except Exception as e:
+        st.error(f"Error fetching data: {e}")
         return pd.DataFrame(columns=['datetime', 'open', 'high', 'low', 'close', 'volume'])
-
 
 # Update signals based on new data
 def update_signals():
@@ -45,7 +41,7 @@ def update_signals():
     new_data = fetch_data()
     
     if new_data.empty:
-        print("No new data fetched.")
+        st.warning("No new data fetched.")
         return None, None, None
     
     # Append new data to the existing DataFrame
@@ -106,12 +102,12 @@ c = 10
 df = pd.DataFrame(columns=['datetime', 'open', 'high', 'low', 'close', 'volume'])
 
 # Streamlit UI setup
-st.title("XRP/USDT Trading Signal with Dynamic Quantity")
+st.title("XRP/USDT Trading Signal with Dynamic Updates")
 st.write("This app fetches data from Binance and generates trading signals.")
 
-# Display the signal
-while True:
+if st.button("Fetch Signal"):
     signal, price, timestamp = update_signals()
     if signal and price:
         st.write(f"Signal: {signal} at {timestamp}, Price: {price}")
-    time.sleep(60)  # Sleep for 1 minute before checking again
+    else:
+        st.write("No new signal available.")
