@@ -12,25 +12,32 @@ def fetch_data(symbol='XRPUSDT', interval='1m'):
         'interval': interval,
         'limit': 100  # Get 100 data points for better analysis
     }
-    response = requests.get(url, params=params)
-    data = response.json()
-    
-    if not data:
-        print("No data fetched.")
+    try:
+        response = requests.get(url, params=params)
+        response.raise_for_status()  # Raise an HTTPError for bad responses (4xx and 5xx)
+        data = response.json()
+        
+        # Validate the response structure
+        if not isinstance(data, list) or len(data) == 0 or not isinstance(data[0], list):
+            print("Unexpected data format received from Binance API.")
+            return pd.DataFrame(columns=['datetime', 'open', 'high', 'low', 'close', 'volume'])
+
+        # Extract relevant fields
+        o, h, l, c, v = zip(*[(float(d[1]), float(d[2]), float(d[3]), float(d[4]), float(d[5])) for d in data])
+        datetime = pd.to_datetime([d[0] for d in data], unit='ms')
+        
+        return pd.DataFrame({
+            'datetime': datetime,
+            'open': o,
+            'high': h,
+            'low': l,
+            'close': c,
+            'volume': v
+        })
+    except (requests.exceptions.RequestException, ValueError) as e:
+        print(f"Error fetching data from Binance API: {e}")
         return pd.DataFrame(columns=['datetime', 'open', 'high', 'low', 'close', 'volume'])
-    
-    # Extract relevant fields
-    o, h, l, c, v = zip(*[(float(d[1]), float(d[2]), float(d[3]), float(d[4]), float(d[5])) for d in data])
-    datetime = pd.to_datetime([d[0] for d in data], unit='ms')
-    
-    return pd.DataFrame({
-        'datetime': datetime,
-        'open': o,
-        'high': h,
-        'low': l,
-        'close': c,
-        'volume': v
-    })
+
 
 # Update signals based on new data
 def update_signals():
